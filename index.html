@@ -664,6 +664,7 @@ function changeQty(e, id, delta) {
 }
 
 function updateProductStockUI() {
+  const removedFromCart = window._removedFromCart || [];
   const allMenus = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
   for (const menu of allMenus) {
     const card = document.getElementById(`card-${menu.id}`);
@@ -684,11 +685,13 @@ function updateProductStockUI() {
       badge.textContent = "売り切れ";
       badge.style.color = "#e74c3c";
       card.classList.add("sold-out");
-      // カートから削除
+      // カートから削除（削除された場合はアラート用に記録）
       if (cart[menu.id]) {
         delete cart[menu.id];
         card.classList.remove("selected");
         document.getElementById(`qty-${menu.id}`).style.display = "none";
+        document.getElementById(`num-${menu.id}`).textContent = "1";
+        removedFromCart.push(menu.name);
       }
     } else {
       badge.textContent = `残り${remaining}個`;
@@ -768,11 +771,16 @@ async function renderTimeSlots() {
   const allMenusFlat = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
   productStock = {};
   for (const menu of allMenusFlat) {
-    const max = stockSettings[menu.id] !== undefined ? stockSettings[menu.id] : (menu.max || 0);
+    const max = stockSettings[menu.id] !== undefined ? stockSettings[menu.id] : (menu.max !== undefined ? menu.max : 99);
     const ordered = productCounts[menu.id] || 0;
     productStock[menu.id] = Math.max(0, max - ordered);
   }
+  const removedFromCart = [];
+  window._removedFromCart = removedFromCart;
   updateProductStockUI();
+  if (removedFromCart.length > 0) {
+    alert(`以下の商品はこの日付の在庫がなくなったため、カートから削除されました:\n\n${removedFromCart.join("\n")}\n\n別の商品を選択するか、別の日付をお選びください。`);
+  }
 
   container.innerHTML = TIME_SLOTS.map(t => {
     const count = slotCounts[t] || 0;
@@ -829,6 +837,10 @@ function goToStep3() {
 
   if (!date || !selectedTime || !name) {
     errEl.classList.add("show");
+    return;
+  }
+  if (Object.keys(cart).length === 0) {
+    alert("商品が選択されていません。ステップ1に戻って商品を選び直してください。");
     return;
   }
   errEl.classList.remove("show");
