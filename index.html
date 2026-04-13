@@ -550,6 +550,7 @@ let cart = {}; // { menuId: qty }
 let selectedTime = null;
 let liffInitialized = false;
 let productStock = {}; // { menuId: remaining } 日付選択後に設定
+let stockSettings = {}; // { menuId: max } スプレッドシートから取得
 
 // ============================================================
 // LIFF初期化
@@ -564,8 +565,8 @@ async function initLiff() {
   document.getElementById("loading").style.display = "none";
   document.getElementById("app").style.display = "block";
   initMenus();
-  showInitialStock();
   initDatePicker();
+  loadStockSettings();
 }
 
 // ============================================================
@@ -596,14 +597,36 @@ function renderMenuGrid(gridId, items) {
   `).join("");
 }
 
+async function loadStockSettings() {
+  if (GAS_URL === "YOUR_GAS_URL_HERE") {
+    showInitialStock();
+    return;
+  }
+  try {
+    const res = await fetch(`${GAS_URL}?_t=${Date.now()}`, { cache: "no-store" });
+    const data = await res.json();
+    stockSettings = data.settings || {};
+  } catch (e) {
+    console.warn("在庫設定の取得に失敗しました", e);
+  }
+  showInitialStock();
+}
+
 function showInitialStock() {
   const allMenus = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
   for (const menu of allMenus) {
     const badge = document.getElementById(`stock-${menu.id}`);
-    if (!badge) continue;
-    if (menu.max) {
-      badge.textContent = `残り${menu.max}個`;
-      badge.style.color = menu.max <= 2 ? "#e67e22" : "#06C755";
+    const card = document.getElementById(`card-${menu.id}`);
+    if (!badge || !card) continue;
+    const max = stockSettings[menu.id] !== undefined ? stockSettings[menu.id] : (menu.max || 0);
+    if (max === 0) {
+      badge.textContent = "売り切れ";
+      badge.style.color = "#e74c3c";
+      card.classList.add("sold-out");
+    } else {
+      badge.textContent = `残り${max}個`;
+      badge.style.color = max <= 2 ? "#e67e22" : "#06C755";
+      card.classList.remove("sold-out");
     }
   }
 }
@@ -648,12 +671,11 @@ function updateProductStockUI() {
 
     const remaining = productStock[menu.id];
     if (remaining === undefined) {
-      // 日付未選択時は初期在庫数を表示
-      if (menu.max) {
-        badge.textContent = `残り${menu.max}個`;
-        badge.style.color = menu.max <= 2 ? "#e67e22" : "#06C755";
-      }
-      card.classList.remove("sold-out");
+      // 日付未選択時はスプレッドシート設定値を表示
+      const max = stockSettings[menu.id] !== undefined ? stockSettings[menu.id] : (menu.max || 0);
+      badge.textContent = max === 0 ? "売り切れ" : `残り${max}個`;
+      badge.style.color = max === 0 ? "#e74c3c" : (max <= 2 ? "#e67e22" : "#06C755");
+      if (max === 0) card.classList.add("sold-out"); else card.classList.remove("sold-out");
       continue;
     }
 
@@ -735,17 +757,19 @@ async function renderTimeSlots() {
       const data = await res.json();
       slotCounts = data.slots || {};
       productCounts = data.products || {};
+      if (data.settings) stockSettings = data.settings;
     } catch (e) {
       console.warn("空き状況の取得に失敗しました", e);
     }
   }
 
-  // 商品在庫を更新
+  // 商品在庫を更新（スプレッドシート設定値を優先）
   const allMenusFlat = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
   productStock = {};
   for (const menu of allMenusFlat) {
+    const max = stockSettings[menu.id] !== undefined ? stockSettings[menu.id] : (menu.max || 0);
     const ordered = productCounts[menu.id] || 0;
-    productStock[menu.id] = (menu.max || 99) - ordered;
+    productStock[menu.id] = Math.max(0, max - ordered);
   }
   updateProductStockUI();
 
