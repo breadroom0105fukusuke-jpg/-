@@ -197,6 +197,19 @@
       border-color: #e0e0e0;
     }
 
+    /* 在庫バッジ */
+    .stock-badge {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 4px;
+      display: block;
+    }
+    .menu-card.sold-out {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
     /* 名前入力 */
     .contact-section { background: white; border-radius: 12px; padding: 16px; }
 
@@ -536,6 +549,7 @@ const CUTOFF_HOUR = 16; // 受付締切時刻（時）
 let cart = {}; // { menuId: qty }
 let selectedTime = null;
 let liffInitialized = false;
+let productStock = {}; // { menuId: remaining } 日付選択後に設定
 
 // ============================================================
 // LIFF初期化
@@ -571,6 +585,7 @@ function renderMenuGrid(gridId, items) {
         : `<span class="emoji">${item.emoji}</span>`}
       <div class="name">${item.name}</div>
       <div class="price">¥${item.price.toLocaleString()}</div>
+      <span class="stock-badge" id="stock-${item.id}"></span>
       <div class="qty-control" id="qty-${item.id}" style="display:none;">
         <div class="qty-btn" onclick="changeQty(event,'${item.id}',-1)">−</div>
         <span class="qty-num" id="num-${item.id}">1</span>
@@ -581,6 +596,8 @@ function renderMenuGrid(gridId, items) {
 }
 
 function toggleMenu(id) {
+  const remaining = productStock[id] !== undefined ? productStock[id] : null;
+  if (!cart[id] && remaining !== null && remaining <= 0) return; // 売り切れ
   if (cart[id]) {
     delete cart[id];
     document.getElementById(`card-${id}`).classList.remove("selected");
@@ -602,9 +619,43 @@ function changeQty(e, id, delta) {
   }
   const allMenus = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
   const menu = allMenus.find(m => m.id === id);
-  if (menu?.max && newQty > menu.max) return;
+  // 在庫あり：残数を上限に、未取得時はmenu.maxを使用
+  const limit = productStock[id] !== undefined ? productStock[id] : (menu?.max || 99);
+  if (newQty > limit) return;
   cart[id] = newQty;
   document.getElementById(`num-${id}`).textContent = newQty;
+}
+
+function updateProductStockUI() {
+  const allMenus = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
+  for (const menu of allMenus) {
+    const card = document.getElementById(`card-${menu.id}`);
+    const badge = document.getElementById(`stock-${menu.id}`);
+    if (!card || !badge) continue;
+
+    const remaining = productStock[menu.id];
+    if (remaining === undefined) {
+      badge.textContent = "";
+      card.classList.remove("sold-out");
+      continue;
+    }
+
+    if (remaining <= 0) {
+      badge.textContent = "売り切れ";
+      badge.style.color = "#e74c3c";
+      card.classList.add("sold-out");
+      // カートから削除
+      if (cart[menu.id]) {
+        delete cart[menu.id];
+        card.classList.remove("selected");
+        document.getElementById(`qty-${menu.id}`).style.display = "none";
+      }
+    } else {
+      badge.textContent = `残り${remaining}個`;
+      badge.style.color = remaining <= 2 ? "#e67e22" : "#06C755";
+      card.classList.remove("sold-out");
+    }
+  }
 }
 
 // ============================================================
@@ -642,7 +693,12 @@ async function renderTimeSlots() {
   const container = document.getElementById("time-slots");
   selectedTime = null;
 
-  if (!dateVal) { container.innerHTML = ""; return; }
+  if (!dateVal) {
+    container.innerHTML = "";
+    productStock = {};
+    updateProductStockUI();
+    return;
+  }
 
   const dayOfWeek = new Date(dateVal + "T00:00:00").getDay();
   const isClosed = CLOSED_DAYS.includes(dayOfWeek);
@@ -654,18 +710,30 @@ async function renderTimeSlots() {
 
   container.innerHTML = `<p style="color:#999; font-size:13px; grid-column:1/-1;">空き状況を確認中...</p>`;
 
-  let counts = {};
+  let slotCounts = {};
+  let productCounts = {};
   if (GAS_URL !== "YOUR_GAS_URL_HERE") {
     try {
       const res = await fetch(`${GAS_URL}?date=${dateVal}`);
-      counts = await res.json();
+      const data = await res.json();
+      slotCounts = data.slots || {};
+      productCounts = data.products || {};
     } catch (e) {
       console.warn("空き状況の取得に失敗しました", e);
     }
   }
 
+  // 商品在庫を更新
+  const allMenusFlat = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
+  productStock = {};
+  for (const menu of allMenusFlat) {
+    const ordered = productCounts[menu.id] || 0;
+    productStock[menu.id] = (menu.max || 99) - ordered;
+  }
+  updateProductStockUI();
+
   container.innerHTML = TIME_SLOTS.map(t => {
-    const count = counts[t] || 0;
+    const count = slotCounts[t] || 0;
     const isFull = count >= MAX_PER_SLOT;
     const remaining = MAX_PER_SLOT - count;
     return `
@@ -812,11 +880,11 @@ async function submitReservation() {
   try {
     // GASに予約データを保存
     if (GAS_URL !== "YOUR_GAS_URL_HERE") {
-      const allMenus = [...MENUS.bread, ...MENUS.chiffon];
-      const itemsSummary = Object.entries(cart).map(([id, qty]) => {
-        const menu = allMenus.find(m => m.id === id);
-        return menu ? `${menu.name}×${qty}` : "";
-      }).filter(Boolean).join(", ");
+      const allMenusFlat = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
+      const itemsArray = Object.entries(cart).map(([id, qty]) => {
+        const menu = allMenusFlat.find(m => m.id === id);
+        return menu ? { id, name: menu.name, qty, max: menu.max || 99 } : null;
+      }).filter(Boolean);
 
       const gasRes = await fetch(GAS_URL, {
         method: "POST",
@@ -824,7 +892,7 @@ async function submitReservation() {
           date: document.getElementById("pickup-date").value,
           time: selectedTime,
           name,
-          items: itemsSummary,
+          items: itemsArray,
           total,
           notes,
         }),
