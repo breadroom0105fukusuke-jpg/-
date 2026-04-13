@@ -509,7 +509,7 @@ const MENUS = {
     { id: "b18", emoji: "🧀", name: "チーズブレット",            price: 380, max: 3,  img: "images/チーズブレット.PNG" },
   ],
   shu: [
-    { id: "s1", emoji: "🍮", name: "米粉シュークリーム", price: 380, img: "images/米粉シュークリーム.PNG" },
+    { id: "s1", emoji: "🍮", name: "米粉シュークリーム", price: 380, max: 5, img: "images/米粉シュークリーム.PNG" },
   ],
   chiffon: [
     { id: "c1", emoji: "🧀", name: "クリームチーズ米粉シフォン",            price: 300, max: 6, img: "images/クリームチーズシフォン.PNG" },
@@ -861,7 +861,7 @@ function renderConfirm() {
   }
 
   // 注文明細
-  const allMenus = [...MENUS.bread, ...MENUS.chiffon];
+  const allMenus = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
   let itemsHtml = "";
   let total = 0;
 
@@ -898,7 +898,7 @@ async function submitReservation() {
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
   const dateStr = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
 
-  const allMenus = [...MENUS.bread, ...MENUS.chiffon];
+  const allMenus = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
   let itemLines = "";
   let total = 0;
 
