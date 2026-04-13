@@ -618,7 +618,8 @@ function showInitialStock() {
     const badge = document.getElementById(`stock-${menu.id}`);
     const card = document.getElementById(`card-${menu.id}`);
     if (!badge || !card) continue;
-    const max = stockSettings[menu.id] !== undefined ? stockSettings[menu.id] : (menu.max || 0);
+    // スプレッドシート設定値があればそちらを優先、なければmenu.maxを使用
+    const max = stockSettings[menu.id] !== undefined ? stockSettings[menu.id] : (menu.max !== undefined ? menu.max : 99);
     if (max === 0) {
       badge.textContent = "売り切れ";
       badge.style.color = "#e74c3c";
