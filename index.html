@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ご予約フォーム</title>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #06C755;
+      color: white;
+      padding: 16px 20px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+
+    /* ステップバー */
+    .steps {
+      display: flex;
+      background: white;
+      padding: 12px 20px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .step {
+      flex: 1;
+      text-align: center;
+      font-size: 11px;
+      color: #999;
+      position: relative;
+    }
+    .step.active { color: #06C755; font-weight: 700; }
+    .step.done { color: #06C755; }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: #e0e0e0;
+      color: #999;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .step.active .step-num { background: #06C755; color: white; }
+    .step.done .step-num { background: #06C755; color: white; }
+    .step-label { display: block; }
+
+    /* メインコンテンツ */
+    .page { display: none; padding: 16px; }
+    .page.active { display: block; }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #06C755;
+    }
+
+    /* メニューカード */
+    .menu-category { margin-bottom: 24px; }
+    .menu-category h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .menu-card {
+      background: white;
+      border-radius: 12px;
+      padding: 14px 12px;
+      border: 2px solid #e8e8e8;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .menu-card:active { transform: scale(0.97); }
+    .menu-card.selected {
+      border-color: #06C755;
+      background: #f0fdf4;
+    }
+    .menu-card .emoji { font-size: 28px; display: block; margin-bottom: 6px; }
+    .menu-card .menu-img {
+      width: 100%; aspect-ratio: 1/1; object-fit: cover;
+      border-radius: 8px; margin-bottom: 6px; display: block;
+    }
+    .menu-card .name { font-size: 13px; font-weight: 700; color: #333; }
+    .menu-card .price { font-size: 12px; color: #06C755; margin-top: 2px; }
+
+    /* 数量コントロール */
+    .qty-control {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .qty-btn {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid #06C755;
+      background: white;
+      color: #06C755;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      line-height: 1;
+      font-weight: 700;
+    }
+    .qty-btn:active { background: #f0fdf4; }
+    .qty-num { font-size: 16px; font-weight: 700; min-width: 20px; text-align: center; }
+
+    /* 日時選択 */
+    .date-section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 8px;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: inherit;
+      background: white;
+      color: #333;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #06C755;
+    }
+
+    .time-slots {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .time-slot {
+      padding: 10px 6px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      background: white;
+      transition: all 0.2s;
+    }
+    .time-slot:active { transform: scale(0.95); }
+    .time-slot.selected {
+      border-color: #06C755;
+      background: #f0fdf4;
+      color: #06C755;
+    }
+    .time-slot.unavailable {
+      background: #f5f5f5;
+      color: #bbb;
+      cursor: not-allowed;
+      border-color: #e0e0e0;
+    }
+
+    /* 名前入力 */
+    .contact-section { background: white; border-radius: 12px; padding: 16px; }
+
+    /* 確認ページ */
+    .confirm-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .confirm-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+    .confirm-row:last-child { border-bottom: none; }
+    .confirm-row .label { color: #888; font-size: 13px; flex-shrink: 0; width: 90px; }
+    .confirm-row .value { color: #333; font-weight: 600; text-align: right; }
+
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+    .order-item:last-child { border-bottom: none; }
+    .order-total {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0 4px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #06C755;
+    }
+
+    /* ボタン */
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+    .btn-primary {
+      background: #06C755;
+      color: white;
+    }
+    .btn-primary:active { background: #059a43; }
+    .btn-primary:disabled { background: #b0e0c0; cursor: not-allowed; }
+    .btn-secondary {
+      background: white;
+      color: #06C755;
+      border: 2px solid #06C755;
+    }
+    .btn-secondary:active { background: #f0fdf4; }
+
+    /* 完了ページ */
+    .complete-page {
+      text-align: center;
+      padding: 48px 24px;
+    }
+    .complete-icon {
+      font-size: 64px;
+      display: block;
+      margin-bottom: 16px;
+    }
+    .complete-page h2 { font-size: 22px; color: #06C755; margin-bottom: 10px; }
+    .complete-page p { font-size: 14px; color: #666; line-height: 1.6; }
+
+    /* ローディング */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #06C755;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* エラーメッセージ */
+    .error-msg {
+      background: #fff3f3;
+      color: #c0392b;
+      border: 1px solid #f5c6cb;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    .notice {
+      background: #f0fdf4;
+      border-left: 4px solid #06C755;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #555;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="color:#666; font-size:14px;">読み込み中...</p>
+</div>
+
+<div id="app" style="display:none;">
+  <header>
+    <h1>🍞 ご予約フォーム</h1>
+    <p>パン・シフォンケーキの事前予約</p>
+  </header>
+
+  <!-- ステップバー -->
+  <div class="steps">
+    <div class="step active" id="step-1">
+      <div class="step-num">1</div>
+      <span class="step-label">メニュー</span>
+    </div>
+    <div class="step" id="step-2">
+      <div class="step-num">2</div>
+      <span class="step-label">日時</span>
+    </div>
+    <div class="step" id="step-3">
+      <div class="step-num">3</div>
+      <span class="step-label">確認</span>
+    </div>
+  </div>
+
+  <!-- ページ1: メニュー選択 -->
+  <div class="page active" id="page-1">
+    <p class="section-title">メニューを選んでください</p>
+
+    <div class="notice">
+      商品をタップして選択し、個数を調整してください。<br>
+      複数の商品を選ぶことができます。
+    </div>
+
+    <!-- パン -->
+    <div class="menu-category">
+      <h3>🍞 パン</h3>
+      <div class="menu-grid" id="bread-grid"></div>
+    </div>
+
+    <!-- シフォンケーキ -->
+    <div class="menu-category">
+      <h3>🍮 米粉シュークリーム</h3>
+      <div class="menu-grid" id="shu-grid"></div>
+    </div>
+
+    <div class="menu-category">
+      <h3>🎂 シフォンケーキ</h3>
+      <div class="menu-grid" id="chiffon-grid"></div>
+    </div>
+
+    <div id="menu-error" class="error-msg">商品を1つ以上選択してください</div>
+    <button class="btn btn-primary" onclick="goToStep2()">次へ　→</button>
+  </div>
+
+  <!-- ページ2: 日時・名前 -->
+  <div class="page" id="page-2">
+    <p class="section-title">受取日時をお選びください</p>
+
+    <div class="date-section">
+      <div class="form-group">
+        <label>📅 受取日</label>
+        <input type="date" id="pickup-date" onchange="renderTimeSlots()" oninput="renderTimeSlots()">
+      </div>
+
+      <div class="form-group">
+        <label>🕐 受取時間帯</label>
+        <div class="time-slots" id="time-slots"></div>
+      </div>
+    </div>
+
+    <div class="contact-section">
+      <div class="form-group">
+        <label>👤 お名前（受取時の確認用）</label>
+        <input type="text" id="customer-name" placeholder="例：山田 花子" maxlength="20">
+      </div>
+      <div class="form-group">
+        <label>📝 備考・アレルギー等（任意）</label>
+        <input type="text" id="notes" placeholder="例：ナッツアレルギーあり" maxlength="100">
+      </div>
+    </div>
+
+    <div id="datetime-error" class="error-msg">日付・時間帯・お名前をご入力ください</div>
+
+    <button class="btn btn-secondary" onclick="goToStep1()">← 戻る</button>
+    <button class="btn btn-primary" onclick="goToStep3()">確認画面へ　→</button>
+  </div>
+
+  <!-- ページ3: 確認 -->
+  <div class="page" id="page-3">
+    <p class="section-title">ご予約内容の確認</p>
+
+    <div class="confirm-card">
+      <div class="confirm-row">
+        <span class="label">受取日</span>
+        <span class="value" id="confirm-date"></span>
+      </div>
+      <div class="confirm-row">
+        <span class="label">受取時間</span>
+        <span class="value" id="confirm-time"></span>
+      </div>
+      <div class="confirm-row">
+        <span class="label">お名前</span>
+        <span class="value" id="confirm-name"></span>
+      </div>
+      <div class="confirm-row" id="confirm-notes-row">
+        <span class="label">備考</span>
+        <span class="value" id="confirm-notes"></span>
+      </div>
+    </div>
+
+    <div class="confirm-card">
+      <div class="section-title" style="margin-bottom:10px;">ご注文内容</div>
+      <div id="confirm-items"></div>
+      <div class="order-total">
+        <span>合計</span>
+        <span id="confirm-total"></span>
+      </div>
+    </div>
+
+    <div class="notice" style="margin-bottom:16px;">
+      「予約を確定する」を押すと、LINEトークにご予約内容が送信されます。
+    </div>
+
+    <button class="btn btn-secondary" onclick="goToStep2()">← 戻る</button>
+    <button class="btn btn-primary" id="submit-btn" onclick="submitReservation()">✅ 予約を確定する</button>
+  </div>
+
+  <!-- 完了ページ -->
+  <div class="page" id="page-complete">
+    <div class="complete-page">
+      <span class="complete-icon">🎉</span>
+      <h2>ご予約ありがとうございます！</h2>
+      <p>LINEトークにご予約内容をお送りしました。<br><br>
+        ご来店をお待ちしております。<br>
+        ご不明な点はトークにてお問い合わせください。</p>
+      <button class="btn btn-primary" style="margin-top:32px;" onclick="closeLiff()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 設定（ここをカスタマイズしてください）
+// ============================================================
+const LIFF_ID = "YOUR_LIFF_ID_HERE"; // ← LIFFIDに置き換えてください
+
+const MENUS = {
+  bread: [
+    { id: "b1",  emoji: "🧅", name: "ねぎ角煮パン",              price: 250, max: 6, img: "images/ねぎ角煮.PNG" },
+    { id: "b2",  emoji: "🌮", name: "タコスパン",                price: 250, max: 6,  img: "images/タコスパン最新.PNG" },
+    { id: "b3",  emoji: "🍡", name: "あんぱん",                  price: 180, max: 6,  img: "images/あんぱん.JPG" },
+    { id: "b4",  emoji: "🫘", name: "ミニあんブレット",          price: 280, max: 6, img: "images/ミニあんブレット最新.PNG" },
+    { id: "b5",  emoji: "🍞", name: "プチ食パン",                price: 200, max: 2,  img: "images/プチ食パン.jpg" },
+    { id: "b6",  emoji: "🧄", name: "ガーリックオニオンベーコン", price: 290, max: 3,  img: "images/ガーリックオニオンベーコン最新の最新.PNG" },
+    { id: "b7",  emoji: "🥓", name: "ベーコンエピ",              price: 270, max: 3,  img: "images/ベーコンエピ.JPG" },
+    { id: "b8",  emoji: "🥧", name: "米粉のキッシュ",            price: 480, max: 3,  img: "images/米粉のキッシュ.PNG" },
+    { id: "b9",  emoji: "🍔", name: "自家製ハンバーガー",        price: 290, max: 4,  img: "images/自家製ハンバーガー.PNG" },
+    { id: "b10", emoji: "🌭", name: "野菜のサルサドック",        price: 300, max: 5,  img: "images/野菜のサルサドック.PNG" },
+    { id: "b11", emoji: "🥩", name: "ソーセージボード",          price: 280, max: 5, img: "images/ソーセージボード.PNG" },
+    { id: "b12", emoji: "🍛", name: "カレーパン",                price: 250, max: 6,  img: "images/カレーパン.png" },
+    { id: "b13", emoji: "🍢", name: "ちくわパン",                price: 250, max: 6,  img: "images/ちくわパン.PNG" },
+    { id: "b14", emoji: "🍞", name: "生食パン",                  price: 580, max: 2,  img: "images/生食パン.JPG" },
+    { id: "b15", emoji: "🥐", name: "クロワッサンダマンド",      price: 280, max: 2, img: "images/クロワッサンダマンド.PNG" },
+    { id: "b19", emoji: "🍫", name: "チョコクロワッサン",        price: 280, max: 3,  img: "images/チョコクロワッサン.jpg" },
+    { id: "b16", emoji: "🥖", name: "めんたいフランス",          price: 230, max: 4,  img: "images/明太フランス最新.PNG" },
+    { id: "b17", emoji: "🧄", name: "クリチガーリック",          price: 250, max: 4, img: "images/クリチガーリック.PNG" },
+    { id: "b18", emoji: "🧀", name: "チーズブレット",            price: 380, max: 3,  img: "images/チーズブレット.PNG" },
+  ],
+  shu: [
+    { id: "s1", emoji: "🍮", name: "米粉シュークリーム", price: 380, img: "images/米粉シュークリーム.PNG" },
+  ],
+  chiffon: [
+    { id: "c1", emoji: "🧀", name: "クリームチーズ米粉シフォン",            price: 300, max: 6, img: "images/クリームチーズシフォン.PNG" },
+    { id: "c2", emoji: "🍫", name: "ショコラクランベリー米粉シフォン",      price: 280, max: 6, img: "images/ショコラクランベリー.PNG" },
+    { id: "c3", emoji: "🍌", name: "バナナ米粉シフォン",                    price: 250, max: 6, img: "images/バナナ米粉シフォン.PNG" },
+    { id: "c4", emoji: "🫖", name: "アールグレイ",                          price: 250, max: 6, img: "images/アールグレイ米粉シフォン.PNG" },
+    { id: "c5", emoji: "🍫", name: "ショコラクランベリー米粉シフォンサンド", price: 380, max: 4, img: "images/ショコラクランベリーシフォンサンド最新.PNG" },
+    { id: "c6", emoji: "🍌", name: "バナナシフォン米粉サンド",              price: 350, max: 4, img: "images/バナナシフォンサンド.PNG" },
+    { id: "c7", emoji: "🫖", name: "アールグレイ米粉シフォンサンド",        price: 350, max: 4, img: "images/アールグレイシフォンサンド最新.PNG" },
+  ]
+};
+
+// 受付時間帯（定休日なども考慮して調整してください）
+const TIME_SLOTS = [
+  "10:00〜11:00",
+  "11:00〜12:00",
+  "12:00〜13:00",
+];
+
+// 受取可能曜日（土=6・日=0 のみ受付）
+const CLOSED_DAYS = [1, 2, 3, 4, 5]; // 平日は受取不可
+
+// Google Apps Script URL（デプロイ後に置き換え）
+const GAS_URL = "YOUR_GAS_URL_HERE";
+
+// 各時間帯の最大予約枠数
+const MAX_PER_SLOT = 3;
+
+// 予約受付期間（最大何日先まで）
+const MAX_DAYS_AHEAD = 14;
+// 前日16時を過ぎた場合は翌々日から受付（それ以前は翌日から受付）
+const CUTOFF_HOUR = 16; // 受付締切時刻（時）
+
+// ============================================================
+// 状態管理
+// ============================================================
+let cart = {}; // { menuId: qty }
+let selectedTime = null;
+let liffInitialized = false;
+
+// ============================================================
+// LIFF初期化
+// ============================================================
+async function initLiff() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    liffInitialized = true;
+  } catch (e) {
+    console.warn("LIFF init failed (running in browser?):", e);
+  }
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  initMenus();
+  initDatePicker();
+}
+
+// ============================================================
+// メニュー初期化
+// ============================================================
+function initMenus() {
+  renderMenuGrid("bread-grid", MENUS.bread);
+  renderMenuGrid("shu-grid", MENUS.shu);
+  renderMenuGrid("chiffon-grid", MENUS.chiffon);
+}
+
+function renderMenuGrid(gridId, items) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = items.map(item => `
+    <div class="menu-card" id="card-${item.id}" onclick="toggleMenu('${item.id}')">
+      ${item.img
+        ? `<img class="menu-img" src="${item.img}" alt="${item.name}" loading="lazy">`
+        : `<span class="emoji">${item.emoji}</span>`}
+      <div class="name">${item.name}</div>
+      <div class="price">¥${item.price.toLocaleString()}</div>
+      <div class="qty-control" id="qty-${item.id}" style="display:none;">
+        <div class="qty-btn" onclick="changeQty(event,'${item.id}',-1)">−</div>
+        <span class="qty-num" id="num-${item.id}">1</span>
+        <div class="qty-btn" onclick="changeQty(event,'${item.id}',1)">＋</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function toggleMenu(id) {
+  if (cart[id]) {
+    delete cart[id];
+    document.getElementById(`card-${id}`).classList.remove("selected");
+    document.getElementById(`qty-${id}`).style.display = "none";
+  } else {
+    cart[id] = 1;
+    document.getElementById(`card-${id}`).classList.add("selected");
+    document.getElementById(`qty-${id}`).style.display = "flex";
+    document.getElementById(`num-${id}`).textContent = 1;
+  }
+}
+
+function changeQty(e, id, delta) {
+  e.stopPropagation();
+  const newQty = (cart[id] || 0) + delta;
+  if (newQty <= 0) {
+    toggleMenu(id);
+    return;
+  }
+  const allMenus = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
+  const menu = allMenus.find(m => m.id === id);
+  if (menu?.max && newQty > menu.max) return;
+  cart[id] = newQty;
+  document.getElementById(`num-${id}`).textContent = newQty;
+}
+
+// ============================================================
+// 日付ピッカー初期化
+// ============================================================
+function initDatePicker() {
+  const input = document.getElementById("pickup-date");
+  const now = new Date();
+  // 16時以降は翌々日から、16時前は翌日から受付
+  const minDays = now.getHours() >= CUTOFF_HOUR ? 2 : 1;
+  const minDate = new Date(now);
+  minDate.setDate(now.getDate() + minDays);
+  // 平日の場合は次の土曜日まで進める
+  const minDay = minDate.getDay();
+  if (minDay !== 0 && minDay !== 6) {
+    minDate.setDate(minDate.getDate() + (6 - minDay));
+  }
+  const maxDate = new Date(now);
+  maxDate.setDate(now.getDate() + MAX_DAYS_AHEAD);
+
+  input.min = toDateString(minDate);
+  input.max = toDateString(maxDate);
+  input.value = "";
+}
+
+function toDateString(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+async function renderTimeSlots() {
+  const dateVal = document.getElementById("pickup-date").value;
+  const container = document.getElementById("time-slots");
+  selectedTime = null;
+
+  if (!dateVal) { container.innerHTML = ""; return; }
+
+  const dayOfWeek = new Date(dateVal + "T00:00:00").getDay();
+  const isClosed = CLOSED_DAYS.includes(dayOfWeek);
+
+  if (isClosed) {
+    container.innerHTML = `<p style="color:#e74c3c; font-size:13px; grid-column:1/-1;">受取は土日のみ対応しています。土曜日・日曜日をお選びください。</p>`;
+    return;
+  }
+
+  container.innerHTML = `<p style="color:#999; font-size:13px; grid-column:1/-1;">空き状況を確認中...</p>`;
+
+  let counts = {};
+  if (GAS_URL !== "YOUR_GAS_URL_HERE") {
+    try {
+      const res = await fetch(`${GAS_URL}?date=${dateVal}`);
+      counts = await res.json();
+    } catch (e) {
+      console.warn("空き状況の取得に失敗しました", e);
+    }
+  }
+
+  container.innerHTML = TIME_SLOTS.map(t => {
+    const count = counts[t] || 0;
+    const isFull = count >= MAX_PER_SLOT;
+    const remaining = MAX_PER_SLOT - count;
+    return `
+      <div class="time-slot ${isFull ? 'unavailable' : ''}"
+           onclick="${isFull ? '' : `selectTime(this, '${t}')`}">
+        <div>${t}</div>
+        <small style="font-size:11px; font-weight:400; margin-top:2px; display:block; color:${isFull ? '#bbb' : '#06C755'}">
+          ${isFull ? '満員' : `残${remaining}枠`}
+        </small>
+      </div>`;
+  }).join("");
+
+  // 時間帯が表示されたら自動スクロール
+  container.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function selectTime(el, time) {
+  document.querySelectorAll(".time-slot").forEach(s => s.classList.remove("selected"));
+  el.classList.add("selected");
+  selectedTime = time;
+}
+
+// ============================================================
+// ステップ遷移
+// ============================================================
+function setStep(n) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".step").forEach((s, i) => {
+    s.classList.remove("active", "done");
+    if (i + 1 < n) s.classList.add("done");
+    if (i + 1 === n) s.classList.add("active");
+  });
+  document.getElementById(`page-${n}`).classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+function goToStep1() { setStep(1); }
+
+function goToStep2() {
+  const hasItems = Object.keys(cart).length > 0;
+  const errEl = document.getElementById("menu-error");
+  if (!hasItems) { errEl.classList.add("show"); return; }
+  errEl.classList.remove("show");
+  setStep(2);
+}
+
+function goToStep3() {
+  const date = document.getElementById("pickup-date").value;
+  const name = document.getElementById("customer-name").value.trim();
+  const errEl = document.getElementById("datetime-error");
+
+  if (!date || !selectedTime || !name) {
+    errEl.classList.add("show");
+    return;
+  }
+  errEl.classList.remove("show");
+  renderConfirm();
+  setStep(3);
+}
+
+// ============================================================
+// 確認画面
+// ============================================================
+function renderConfirm() {
+  const date = document.getElementById("pickup-date").value;
+  const name = document.getElementById("customer-name").value.trim();
+  const notes = document.getElementById("notes").value.trim();
+
+  // 日付フォーマット
+  const d = new Date(date + "T00:00:00");
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+  const dateStr = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
+
+  document.getElementById("confirm-date").textContent = dateStr;
+  document.getElementById("confirm-time").textContent = selectedTime;
+  document.getElementById("confirm-name").textContent = name;
+
+  const notesRow = document.getElementById("confirm-notes-row");
+  if (notes) {
+    document.getElementById("confirm-notes").textContent = notes;
+    notesRow.style.display = "flex";
+  } else {
+    notesRow.style.display = "none";
+  }
+
+  // 注文明細
+  const allMenus = [...MENUS.bread, ...MENUS.chiffon];
+  let itemsHtml = "";
+  let total = 0;
+
+  for (const [id, qty] of Object.entries(cart)) {
+    const menu = allMenus.find(m => m.id === id);
+    if (!menu) continue;
+    const subtotal = menu.price * qty;
+    total += subtotal;
+    itemsHtml += `
+      <div class="order-item">
+        <span>${menu.emoji} ${menu.name} × ${qty}</span>
+        <span>¥${subtotal.toLocaleString()}</span>
+      </div>
+    `;
+  }
+
+  document.getElementById("confirm-items").innerHTML = itemsHtml;
+  document.getElementById("confirm-total").textContent = `¥${total.toLocaleString()}`;
+}
+
+// ============================================================
+// 予約送信
+// ============================================================
+async function submitReservation() {
+  const btn = document.getElementById("submit-btn");
+  btn.disabled = true;
+  btn.textContent = "送信中...";
+
+  const date = document.getElementById("pickup-date").value;
+  const name = document.getElementById("customer-name").value.trim();
+  const notes = document.getElementById("notes").value.trim();
+
+  const d = new Date(date + "T00:00:00");
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+  const dateStr = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${weekdays[d.getDay()]}）`;
+
+  const allMenus = [...MENUS.bread, ...MENUS.chiffon];
+  let itemLines = "";
+  let total = 0;
+
+  for (const [id, qty] of Object.entries(cart)) {
+    const menu = allMenus.find(m => m.id === id);
+    if (!menu) continue;
+    const subtotal = menu.price * qty;
+    total += subtotal;
+    itemLines += `  ${menu.emoji} ${menu.name} × ${qty}個 ¥${subtotal.toLocaleString()}\n`;
+  }
+
+  const message = `🍞 ご予約を受け付けました\n\n` +
+    `【受取日時】\n  ${dateStr}\n  ${selectedTime}\n\n` +
+    `【お名前】\n  ${name} 様\n\n` +
+    `【ご注文内容】\n${itemLines}\n` +
+    `【合計】 ¥${total.toLocaleString()}\n` +
+    (notes ? `\n【備考】\n  ${notes}\n` : "") +
+    `\nご来店をお待ちしております！`;
+
+  try {
+    // GASに予約データを保存
+    if (GAS_URL !== "YOUR_GAS_URL_HERE") {
+      const allMenus = [...MENUS.bread, ...MENUS.chiffon];
+      const itemsSummary = Object.entries(cart).map(([id, qty]) => {
+        const menu = allMenus.find(m => m.id === id);
+        return menu ? `${menu.name}×${qty}` : "";
+      }).filter(Boolean).join(", ");
+
+      const gasRes = await fetch(GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          date: document.getElementById("pickup-date").value,
+          time: selectedTime,
+          name,
+          items: itemsSummary,
+          total,
+          notes,
+        }),
+      });
+      const gasData = await gasRes.json();
+      if (!gasData.success) {
+        btn.disabled = false;
+        btn.textContent = "✅ 予約を確定する";
+        alert(gasData.error || "予約の保存に失敗しました。もう一度お試しください。");
+        return;
+      }
+    }
+
+    // LINEメッセージ送信
+    if (liffInitialized && liff.isInClient()) {
+      await liff.sendMessages([{ type: "text", text: message }]);
+    } else {
+      console.log("送信メッセージ:\n", message);
+      alert("【テスト送信】\n\n" + message);
+    }
+
+    // 完了画面へ
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+    document.querySelectorAll(".step").forEach(s => { s.classList.remove("active"); s.classList.add("done"); });
+    document.getElementById("page-complete").classList.add("active");
+    window.scrollTo(0, 0);
+  } catch (e) {
+    console.error(e);
+    btn.disabled = false;
+    btn.textContent = "✅ 予約を確定する";
+    alert("送信に失敗しました。もう一度お試しください。\n" + e.message);
+  }
+}
+
+function closeLiff() {
+  if (liffInitialized && liff.isInClient()) {
+    liff.closeWindow();
+  } else {
+    window.close();
+  }
+}
+
+// 起動
+initLiff();
+</script>
+</body>
+</html>
