@@ -714,7 +714,7 @@ async function renderTimeSlots() {
   let productCounts = {};
   if (GAS_URL !== "YOUR_GAS_URL_HERE") {
     try {
-      const res = await fetch(`${GAS_URL}?date=${dateVal}`);
+      const res = await fetch(`${GAS_URL}?date=${dateVal}&_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       slotCounts = data.slots || {};
       productCounts = data.products || {};
