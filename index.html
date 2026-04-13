@@ -564,6 +564,7 @@ async function initLiff() {
   document.getElementById("loading").style.display = "none";
   document.getElementById("app").style.display = "block";
   initMenus();
+  showInitialStock();
   initDatePicker();
 }
 
@@ -593,6 +594,18 @@ function renderMenuGrid(gridId, items) {
       </div>
     </div>
   `).join("");
+}
+
+function showInitialStock() {
+  const allMenus = [...MENUS.bread, ...MENUS.shu, ...MENUS.chiffon];
+  for (const menu of allMenus) {
+    const badge = document.getElementById(`stock-${menu.id}`);
+    if (!badge) continue;
+    if (menu.max) {
+      badge.textContent = `残り${menu.max}個`;
+      badge.style.color = menu.max <= 2 ? "#e67e22" : "#06C755";
+    }
+  }
 }
 
 function toggleMenu(id) {
@@ -635,7 +648,11 @@ function updateProductStockUI() {
 
     const remaining = productStock[menu.id];
     if (remaining === undefined) {
-      badge.textContent = "";
+      // 日付未選択時は初期在庫数を表示
+      if (menu.max) {
+        badge.textContent = `残り${menu.max}個`;
+        badge.style.color = menu.max <= 2 ? "#e67e22" : "#06C755";
+      }
       card.classList.remove("sold-out");
       continue;
     }
